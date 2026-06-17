@@ -2,7 +2,7 @@
   "name": "CCT – ContrelCustomerTool",
   "short_name": "CCT",
   "description": "Contrel Customer Tool für Aussendienst CH/FL",
-  "start_url": "./",
+  "start_url": "https://patric1974.github.io/Aussendienst-app/",
   "display": "standalone",
   "background_color": "#111111",
   "theme_color": "#111111",
