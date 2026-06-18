@@ -633,14 +633,15 @@ async function renderTour(){
     const dEnd=hasEnd?Math.round(distM(c.lat||sLat,c.lng||sLng,tourEndLat,tourEndLng)/100)/10:null;
     const addr=[c.street,c.plz,c.city].filter(Boolean).join(', ');
     const navUrl=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr||c.name)}&travelmode=driving`;
-    return`<div class="tour-stop">
-      <div class="stop-nr">${i+1}</div>
+    const visited=c.visited;
+    return`<div class="tour-stop" onclick="editCo(${c.id})" style="cursor:pointer">
+      <div class="stop-nr" style="${visited?'background:#16a34a':''}">${visited?'✓':i+1}</div>
       <div class="stop-info">
         <div class="stop-name">${c.name}</div>
         <div class="stop-addr">${addr||'Keine Adresse'}</div>
         <div class="stop-dist">🚀 ~${dStart} km vom Start${dEnd!==null?' &nbsp;·&nbsp; 🏁 ~'+dEnd+' km zum Ziel':''}</div>
       </div>
-      <button class="btn-nav" onclick="window.open('${navUrl}','_blank')">Navi 🧭</button>
+      <button class="btn-nav" onclick="event.stopPropagation();window.open('${navUrl}','_blank')">Navi 🧭</button>
     </div>`;
   }).join('');
 }
