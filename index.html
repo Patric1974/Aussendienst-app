@@ -403,6 +403,12 @@ button{cursor:pointer;font-family:inherit}
         </label>
       </div>
 
+      <div class="dat-sec" style="background:#eff6ff;border-color:#bfdbfe">
+        <div class="dat-title" style="color:#1e40af">☁️ Cloud-Migration</div>
+        <div class="dat-desc" style="color:#1e40af">Lokale Daten (von diesem Gerät) einmalig in die Supabase Cloud übertragen. Danach sind alle Geräte synchron.</div>
+        <button class="bp" style="margin-top:10px;background:#1d4ed8" onclick="migrateToCloud()">📤 Lokale Daten zu Cloud migrieren</button>
+      </div>
+
       <div class="dat-sec">
         <div class="dat-title">📍 Startorte verwalten</div>
         <div class="dat-desc">Feste Startpunkte für die Tourplanung (z.B. Büro, Zuhause).</div>
@@ -424,28 +430,103 @@ button{cursor:pointer;font-family:inherit}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ═══ DB ══════════════════════════════════════════════════════════════════════
-let db;
+// ═══ SUPABASE ════════════════════════════════════════════════════════════════
+const SUPA_URL='https://yanmzozjkcdnbymiuth.supabase.co';
+const SUPA_KEY='sb_publishable_RgAkM7cNjDGsDcHADLjU2g_3-ISdRta';
+let supa;
+
 const SL={i:'Interessent',a:'Angebot läuft',k:'Kunde',n:'Kein Interesse',u:'Unterlagen abgegeben, nachfassen!'};
 const BC={i:'b-i',a:'b-a',k:'b-k',n:'b-n',u:'b-u'};
 
 function openDB(){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open('ad_v3',1);
-    r.onupgradeneeded=e=>{
-      const d=e.target.result;
-      if(!d.objectStoreNames.contains('co'))d.createObjectStore('co',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('vi'))d.createObjectStore('vi',{keyPath:'id',autoIncrement:true});
-    };
-    r.onsuccess=e=>{db=e.target.result;res()};
-    r.onerror=()=>rej(r.error);
-  });
+  supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+  return Promise.resolve();
 }
-const dAll=s=>new Promise((r,j)=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result);q.onerror=j});
-const dGet=(s,i)=>new Promise((r,j)=>{const q=db.transaction(s).objectStore(s).get(i);q.onsuccess=()=>r(q.result);q.onerror=j});
-const dPut=(s,o)=>new Promise((r,j)=>{const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>r(q.result);q.onerror=j});
-const dDel=(s,i)=>new Promise((r,j)=>{const q=db.transaction(s,'readwrite').objectStore(s).delete(i);q.onsuccess=r;q.onerror=j});
+
+// Row converters: DB (snake_case) ↔ App (camelCase)
+function rowToCo(r){return{...r,lastVisit:r.last_visit,createdAt:r.created_at,updatedAt:r.updated_at,contacts:r.contacts||[]}}
+function rowToVi(r){return{...r,companyId:r.company_id,createdAt:r.created_at}}
+function coToRow(c){
+  const r={...c};
+  if('lastVisit' in r){r.last_visit=r.lastVisit;delete r.lastVisit}
+  if('createdAt' in r){r.created_at=r.createdAt;delete r.createdAt}
+  if('updatedAt' in r){r.updated_at=r.updatedAt;delete r.updatedAt}
+  return r;
+}
+function viToRow(v){
+  const r={...v};
+  if('companyId' in r){r.company_id=r.companyId;delete r.companyId}
+  if('createdAt' in r){r.created_at=r.createdAt;delete r.createdAt}
+  return r;
+}
+
+async function dAll(store){
+  const tbl=store==='co'?'companies':'visits';
+  const{data,error}=await supa.from(tbl).select('*').order('id');
+  if(error){console.error(error);return[]}
+  return store==='co'?data.map(rowToCo):data.map(rowToVi);
+}
+async function dGet(store,id){
+  const tbl=store==='co'?'companies':'visits';
+  const{data,error}=await supa.from(tbl).select('*').eq('id',id).single();
+  if(error)return null;
+  return store==='co'?rowToCo(data):rowToVi(data);
+}
+async function dPut(store,obj){
+  const tbl=store==='co'?'companies':'visits';
+  const row=store==='co'?coToRow({...obj}):viToRow({...obj});
+  if(row.id){
+    const{data,error}=await supa.from(tbl).update(row).eq('id',row.id).select().single();
+    if(error)throw error;
+    return data.id;
+  }else{
+    const{data,error}=await supa.from(tbl).insert(row).select().single();
+    if(error)throw error;
+    return data.id;
+  }
+}
+async function dDel(store,id){
+  const tbl=store==='co'?'companies':'visits';
+  const{error}=await supa.from(tbl).delete().eq('id',id);
+  if(error)throw error;
+}
+
+// ═══ MIGRATION (IndexedDB → Supabase) ════════════════════════════════════════
+async function migrateToCloud(){
+  if(!confirm('Lokale Daten zu Supabase Cloud migrieren?\n\nAlle bestehenden Cloud-Daten werden zuerst gelöscht.'))return;
+  toast('Migration läuft...',10000);
+  try{
+    // Read from IndexedDB
+    const idb=await new Promise((res,rej)=>{
+      const r=indexedDB.open('ad_v3',1);
+      r.onsuccess=e=>res(e.target.result);r.onerror=rej;
+    });
+    const idbAll=(store)=>new Promise((r,j)=>{const q=idb.transaction(store).objectStore(store).getAll();q.onsuccess=()=>r(q.result);q.onerror=j});
+    const [cos,vis]=await Promise.all([idbAll('co'),idbAll('vi')]);
+    if(!cos.length){toast('Keine lokalen Daten gefunden');return}
+    // Clear cloud
+    await supa.from('visits').delete().neq('id',0);
+    await supa.from('companies').delete().neq('id',0);
+    // Insert companies (without id so Supabase assigns new ones)
+    const coMap={};
+    for(const c of cos){
+      const oldId=c.id;
+      const row=coToRow({...c});delete row.id;
+      const{data,error}=await supa.from('companies').insert(row).select().single();
+      if(!error)coMap[oldId]=data.id;
+    }
+    // Insert visits with new company ids
+    for(const v of vis){
+      const row=viToRow({...v});delete row.id;
+      row.company_id=coMap[v.companyId||v.company_id]||null;
+      if(row.company_id)await supa.from('visits').insert(row);
+    }
+    await showCos();renderCustomers();
+    toast('✓ '+cos.length+' Kunden migriert',4000);
+  }catch(e){toast('Fehler: '+e.message,5000);console.error(e)}
+}
 
 // ═══ TOAST ═══════════════════════════════════════════════════════════════════
 let tt;
