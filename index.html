@@ -1319,12 +1319,24 @@ async function importJSON(input){
   if(!payload.companies){toast('Kein gültiges Backup');return}
   const n=payload.companies.length;
   if(!confirm(`Backup vom ${payload.exportedAt?.slice(0,10)||'?'} laden?\n${n} Kunden werden importiert.\n\nACHTUNG: Bestehende Daten werden überschrieben!`))return;
-  // Clear existing data
-  const [oldCos,oldVis]=await Promise.all([dAll('co'),dAll('vi')]);
-  await Promise.all([...oldCos.map(c=>dDel('co',c.id)),...oldVis.map(v=>dDel('vi',v.id))]);
-  // Import new data (remove IDs so autoIncrement assigns fresh ones won't conflict — keep IDs for relation integrity)
-  for(const c of payload.companies) await dPut('co',c);
-  for(const v of (payload.visits||[])) await dPut('vi',v);
+  toast('Import läuft...',15000);
+  // Clear existing cloud data
+  await supa.from('visits').delete().neq('id',0);
+  await supa.from('companies').delete().neq('id',0);
+  // Import companies (strip old IDs, build ID map for visits)
+  const idMap={};
+  for(const c of payload.companies){
+    const oldId=c.id;
+    const obj={...c};delete obj.id;
+    const newId=await dPut('co',obj);
+    idMap[oldId]=newId;
+  }
+  // Import visits with remapped company IDs
+  for(const v of (payload.visits||[])){
+    const obj={...v};delete obj.id;
+    obj.companyId=idMap[v.companyId||v.company_id]||null;
+    if(obj.companyId)await dPut('vi',obj);
+  }
   if(payload.savedLocations?.length){
     savedLocations=payload.savedLocations;
     saveLocations();renderLocList();updateStartSel();
