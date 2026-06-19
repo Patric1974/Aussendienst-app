@@ -82,6 +82,7 @@ button{cursor:pointer;font-family:inherit}
 .cm{font-size:13px;color:var(--muted)}
 .cfu{font-size:12px;color:var(--yellow);margin-top:3px;font-weight:600}
 .bdg{font-size:11px;padding:4px 10px;border-radius:12px;font-weight:700;white-space:nowrap;margin-left:8px;flex-shrink:0}
+.b-x{background:#f3f4f6;color:#6b7280}
 .b-i{background:#dbeafe;color:#1e40af}
 .b-a{background:#fef3c7;color:#92400e}
 .b-k{background:#d1fae5;color:#065f46}
@@ -239,6 +240,7 @@ button{cursor:pointer;font-family:inherit}
     <input id="cplz" type="text" inputmode="numeric" maxlength="4" placeholder="PLZ z.B. 63" style="width:100px;flex:none"/>
     <select id="cs">
       <option value="">Alle Status</option>
+      <option value="x">Keine Aktion</option>
       <option value="i">Interessent</option>
       <option value="a">Angebot läuft</option>
       <option value="u">Unterlagen abgegeben, nachfassen!</option>
@@ -343,6 +345,7 @@ button{cursor:pointer;font-family:inherit}
         </div>
         <div class="fi"><label>Status</label>
           <select id="fst2">
+            <option value="x">Keine Aktion</option>
             <option value="i">Interessent</option>
             <option value="a">Angebot läuft</option>
             <option value="u">Unterlagen abgegeben, nachfassen!</option>
@@ -437,8 +440,8 @@ const SUPA_URL='https://yanmzozjkczdnbymiuth.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhbm16b3pqa2N6ZG5ieW1pdXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODc1ODIsImV4cCI6MjA5NzM2MzU4Mn0.EDgG1OCdlwDYgqNUolFlM_NcxJItj-zj5QFlrqm7Dmw';
 let supa;
 
-const SL={i:'Interessent',a:'Angebot läuft',k:'Kunde',n:'Kein Interesse',u:'Unterlagen abgegeben, nachfassen!'};
-const BC={i:'b-i',a:'b-a',k:'b-k',n:'b-n',u:'b-u'};
+const SL={x:'Keine Aktion',i:'Interessent',a:'Angebot läuft',k:'Kunde',n:'Kein Interesse',u:'Unterlagen abgegeben, nachfassen!'};
+const BC={x:'b-x',i:'b-i',a:'b-a',k:'b-k',n:'b-n',u:'b-u'};
 
 function openDB(){
   supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
@@ -1035,7 +1038,7 @@ function openModal(d={}){
   document.getElementById('fbr').value=d.branch||'';
   document.getElementById('fph').value=d.phone||'';
   document.getElementById('fwb').value=d.website||'';
-  document.getElementById('fst2').value=d.status||'i';
+  document.getElementById('fst2').value=d.status||'x';
   document.getElementById('fvd').value=d.lastVisit||today();
   document.getElementById('fno').value='';
   document.getElementById('fvis').checked=!!d.visited;
@@ -1341,7 +1344,7 @@ async function exportJSON(){
 async function exportCSV(){
   const cos=await dAll('co');
   const header=['Name','Strasse','PLZ','Ort','Branche','Telefon','Website','Status','Besucht','Follow-up','Letzter Besuch'];
-  const statusLabel={i:'Interessent',a:'Angebot läuft',u:'Unterlagen abgegeben nachfassen',k:'Kunde',n:'Kein Interesse'};
+  const statusLabel={x:'Keine Aktion',i:'Interessent',a:'Angebot läuft',u:'Unterlagen abgegeben nachfassen',k:'Kunde',n:'Kein Interesse'};
   const rows=cos.map(c=>[
     c.name,c.street||'',c.plz||'',c.city||'',c.branch||'',
     c.phone||'',c.website||'',statusLabel[c.status]||c.status,
