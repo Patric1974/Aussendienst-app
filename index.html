@@ -478,7 +478,9 @@ async function dPut(store,obj){
   const tbl=store==='co'?'companies':'visits';
   const row=store==='co'?coToRow({...obj}):viToRow({...obj});
   if(row.id){
-    const{data,error}=await supa.from(tbl).update(row).eq('id',row.id).select().single();
+    const id=row.id;
+    const{id:_,...rowWithoutId}=row;
+    const{data,error}=await supa.from(tbl).update(rowWithoutId).eq('id',id).select().single();
     if(error)throw error;
     return data.id;
   }else{
