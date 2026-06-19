@@ -608,7 +608,7 @@ async function showCos(){
   const all=await dAll('co');
   cLayers.forEach(m=>map.removeLayer(m));cLayers=[];
   all.forEach(c=>{
-    if(!c.lat||!c.lng)return;
+    if(!c.lat||!c.lng||c.visited)return;
     const m=L.circleMarker([c.lat,c.lng],{radius:13,color:'#fff',fillColor:'#057a55',fillOpacity:1,weight:3}).addTo(map);
     m.on('click',()=>editCo(c.id));
     m.bindTooltip(c.name,{permanent:false,direction:'top',offset:[0,-10]});
