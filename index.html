@@ -1083,12 +1083,16 @@ async function saveCo(){
     contacts:getCts(),followup:fu||null,lastVisit:vd||today(),lat,lng,
     createdAt:editId?(await dGet('co',editId)).createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()};
-  const cid=await dPut('co',obj);
-  if(notes||vd)await dPut('vi',{companyId:editId||cid,date:vd||today(),notes,followup:fu||null,createdAt:new Date().toISOString()});
-  closeModal();showCos();
-  toast(editId?'Aktualisiert ✓':'Firma erfasst ✓');
-  // Switch to customers tab so user sees the saved entry
-  switchPage('customers');
+  try{
+    const cid=await dPut('co',obj);
+    if(notes||vd)await dPut('vi',{companyId:editId||cid,date:vd||today(),notes,followup:fu||null,createdAt:new Date().toISOString()});
+    closeModal();showCos();
+    toast(editId?'Aktualisiert ✓':'Firma erfasst ✓');
+    switchPage('customers');
+  }catch(e){
+    toast('Fehler: '+e.message);
+    console.error(e);
+  }
 }
 
 async function deleteCo(){
