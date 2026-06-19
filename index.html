@@ -389,6 +389,12 @@ button{cursor:pointer;font-family:inherit}
     <div class="mb" style="padding:18px;display:flex;flex-direction:column;gap:12px">
 
       <div class="dat-sec">
+        <div class="dat-title">👤 Mein Name</div>
+        <div class="dat-desc" id="current-username">Angemeldet als: <strong>${getUserName()||'(nicht gesetzt)'}</strong></div>
+        <button class="bp" style="margin-top:10px;font-size:14px" onclick="askUserName();document.getElementById('current-username').innerHTML='Angemeldet als: <strong>'+getUserName()+'</strong>'">✏️ Namen ändern</button>
+      </div>
+
+      <div class="dat-sec">
         <div class="dat-title">📤 Exportieren</div>
         <div class="dat-desc">Alle Kundendaten und Besuche als Datei speichern.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -449,19 +455,21 @@ function openDB(){
 }
 
 // Row converters: DB (snake_case) ↔ App (camelCase)
-function rowToCo(r){return{...r,lastVisit:r.last_visit,createdAt:r.created_at,updatedAt:r.updated_at,contacts:r.contacts||[]}}
-function rowToVi(r){return{...r,companyId:r.company_id,createdAt:r.created_at}}
+function rowToCo(r){return{...r,lastVisit:r.last_visit,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by||'',contacts:r.contacts||[]}}
+function rowToVi(r){return{...r,companyId:r.company_id,createdAt:r.created_at,createdBy:r.created_by||''}}
 function coToRow(c){
   const r={...c};
   if('lastVisit' in r){r.last_visit=r.lastVisit;delete r.lastVisit}
   if('createdAt' in r){r.created_at=r.createdAt;delete r.createdAt}
   if('updatedAt' in r){r.updated_at=r.updatedAt;delete r.updatedAt}
+  if('createdBy' in r){r.created_by=r.createdBy;delete r.createdBy}
   return r;
 }
 function viToRow(v){
   const r={...v};
   if('companyId' in r){r.company_id=r.companyId;delete r.companyId}
   if('createdAt' in r){r.created_at=r.createdAt;delete r.createdAt}
+  if('createdBy' in r){r.created_by=r.createdBy;delete r.createdBy}
   return r;
 }
 
@@ -1086,11 +1094,12 @@ async function saveCo(){
     status:document.getElementById('fst2').value,
     visited:document.getElementById('fvis').checked,
     contacts:getCts(),followup:fu||null,lastVisit:vd||today(),lat,lng,
+    createdBy:editId?(await dGet('co',editId)).createdBy||getUserName():getUserName(),
     createdAt:editId?(await dGet('co',editId)).createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()};
   try{
     const cid=await dPut('co',obj);
-    if(notes||vd)await dPut('vi',{companyId:editId||cid,date:vd||today(),notes,followup:fu||null,createdAt:new Date().toISOString()});
+    if(notes||vd)await dPut('vi',{companyId:editId||cid,date:vd||today(),notes,followup:fu||null,createdBy:getUserName(),createdAt:new Date().toISOString()});
     closeModal();showCos();
     toast(editId?'Aktualisiert ✓':'Firma erfasst ✓');
     switchPage('customers');
@@ -1164,6 +1173,7 @@ async function renderVisits(){
     const rows=stops.map(v=>`
       <div class="vc" onclick="editCo(${v.companyId})" style="cursor:pointer;border-top:1px solid var(--border);padding:12px 16px 12px 32px">
         <div class="vco">${cm[v.companyId]?.name||'Unbekannt'}</div>
+        ${v.createdBy?`<div style="font-size:12px;color:var(--muted);margin-top:2px">👤 ${v.createdBy}</div>`:''}
         ${v.notes?`<div class="vnt" style="font-size:13px;color:#374151;margin-top:3px">${v.notes}</div>`:''}
         ${v.followup?`<div class="vfu">🔔 Follow-up: ${fmt(v.followup)}</div>`:''}
       </div>`).join('');
@@ -1399,9 +1409,17 @@ async function importJSON(input){
   toast('✓ '+n+' Kunden'+locMsg+' importiert',4000);
 }
 
+// ═══ USER NAME ═══════════════════════════════════════════════════════════════
+function getUserName(){return localStorage.getItem('userName')||'';}
+function askUserName(){
+  const n=prompt('Wie heisst du? (wird für Besuche gespeichert)','');
+  if(n&&n.trim()){localStorage.setItem('userName',n.trim());toast('Hallo '+n.trim()+'! 👋');}
+}
+
 // ═══ BOOT ════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   await openDB();
+  if(!getUserName())askUserName();
   initMap();
   showCos();
   updateTourBadge();
@@ -1493,8 +1511,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
       if(parts.length>=2){street=parts[0];const m=parts[1].match(/^(\d{4,5})\s+(.+)$/);if(m){plz=m[1];city=m[2]}}
     }
     const obj={name:r.name,street,city,plz,phone:r.phone||'',website:r.website||'',
-      branch:'',status:'i',contacts:[],followup:null,
-      lat:r.lat,lng:r.lng,lastVisit:today(),
+      branch:'',status:'x',contacts:[],followup:null,
+      lat:r.lat,lng:r.lng,lastVisit:today(),createdBy:getUserName(),
       createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
     await dPut('co',obj);
     closeSheet();showCos();
