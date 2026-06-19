@@ -1159,12 +1159,15 @@ async function renderVisits(){
         ${v.followup?`<div class="vfu">🔔 Follow-up: ${fmt(v.followup)}</div>`:''}
       </div>`).join('');
     return`<div style="border-bottom:2px solid var(--border)">
-      <div onclick="toggleTourDay('${id}')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f9fafb;cursor:pointer">
-        <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f9fafb">
+        <div onclick="toggleTourDay('${id}')" style="flex:1;cursor:pointer">
           <div style="font-size:15px;font-weight:700">📅 Tour ${fmt(date)}</div>
           <div style="font-size:13px;color:var(--muted);margin-top:2px">${stopCount} Besuch${stopCount!==1?'e':''}</div>
         </div>
-        <span id="arr-${id}" style="font-size:20px;color:var(--muted);transition:transform .2s">▸</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="deleteTourDay('${date}')" style="background:#fee2e2;color:#991b1b;border:none;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700">🗑️ Löschen</button>
+          <span id="arr-${id}" onclick="toggleTourDay('${id}')" style="font-size:20px;color:var(--muted);transition:transform .2s;cursor:pointer">▸</span>
+        </div>
       </div>
       <div id="${id}" style="display:none">${rows}</div>
     </div>`;
@@ -1177,6 +1180,15 @@ function toggleTourDay(id){
   const open=el.style.display==='none';
   el.style.display=open?'block':'none';
   arr.style.transform=open?'rotate(90deg)':'';
+}
+
+async function deleteTourDay(date){
+  if(!confirm(`Tour vom ${fmt(date)} wirklich löschen?`))return;
+  const vis=await dAll('vi');
+  const toDelete=vis.filter(v=>v.date===date);
+  for(const v of toDelete)await dDel('vi',v.id);
+  toast('Tour gelöscht');
+  renderVisits();
 }
 
 // ═══ STATS ═══════════════════════════════════════════════════════════════════
