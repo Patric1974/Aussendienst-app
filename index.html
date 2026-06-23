@@ -249,7 +249,11 @@ button{cursor:pointer;font-family:inherit}
     </select>
     <div style="width:100%;display:flex;justify-content:space-between;align-items:center;padding-top:4px">
       <span id="filter-count" style="font-size:12px;color:var(--muted)"></span>
-      <div style="display:flex;gap:10px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="csort" onchange="renderCustomers()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:8px">
+          <option value="date">Neueste zuerst</option>
+          <option value="name">A–Z</option>
+        </select>
         <button id="btn-reset-filter" onclick="resetFilters()" style="display:none;background:none;border:none;font-size:12px;color:var(--blue);font-weight:700;padding:0">Filter leeren ✕</button>
         <button onclick="openModal()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700">＋ Neu</button>
       </div>
@@ -1126,8 +1130,9 @@ async function renderCustomers(){
   const txt=document.getElementById('cf').value.toLowerCase();
   const st=document.getElementById('cs').value;
   const plz=document.getElementById('cplz').value.trim();
+  const sort=document.getElementById('csort')?.value||'date';
   const fl=all.filter(c=>(!txt||(c.name+c.city+c.branch).toLowerCase().includes(txt))&&(!st||c.status===st)&&(!plz||(c.plz||'').startsWith(plz)))
-    .sort((a,b)=>a.name.localeCompare(b.name));
+    .sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):(b.createdAt||'').localeCompare(a.createdAt||''));
   const total=all.length;
   const hasFilter=txt||plz||st;
   document.getElementById('filter-count').textContent=hasFilter?fl.length+' von '+total+' Kunden':total+' Kunden total';
