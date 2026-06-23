@@ -1137,6 +1137,7 @@ async function renderCustomers(){
   el.innerHTML=fl.map(c=>`<div class="card" onclick="editCo(${c.id})">
     <div style="flex:1;min-width:0"><div class="cn">${c.name}${c.visited?' <span style="font-size:11px;background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:8px;font-weight:700;vertical-align:middle">✓ Besucht</span>':''}</div>
     <div class="cm">${c.branch||''}${c.branch&&c.city?' · ':''}${c.city||''}</div>
+    <div class="cm" style="font-size:11px;color:#9ca3af">Erfasst: ${c.createdAt?fmt(c.createdAt.slice(0,10)):'–'}</div>
     ${c.followup?`<div class="cfu">📅 Follow-up: ${fmt(c.followup)}</div>`:''}</div>
     <span class="bdg ${BC[c.status]}">${SL[c.status]||''}</span>
     <button class="tour-btn${tourIds.includes(c.id)?' on':''}" onclick="event.stopPropagation();toggleTour(${c.id})" title="Zur Tour hinzufügen">🚗</button>
