@@ -1285,11 +1285,15 @@ const today=()=>new Date().toISOString().slice(0,10);
 const fmt=s=>{if(!s)return'';const[y,m,d]=s.split('-');return`${d}.${m}.${y}`};
 
 // ═══ STARTORTE ═══════════════════════════════════════════════════════════════
-let savedLocations=JSON.parse(localStorage.getItem('savedLocations')||'[]');
+let savedLocations=[];
 let tourStartLat=null,tourStartLng=null;
 let tourEndLat=null,tourEndLng=null;
 
-function saveLocations(){localStorage.setItem('savedLocations',JSON.stringify(savedLocations))}
+async function loadLocationsFromDB(){
+  const{data,error}=await supa.from('locations').select('*').order('name');
+  if(!error&&data)savedLocations=data;
+  renderLocList();updateStartSel();
+}
 
 function renderLocList(){
   const el=document.getElementById('loc-list');
@@ -1378,17 +1382,22 @@ async function addLocation(){
     const d=await res.json();
     if(!d.places?.length){toast('Adresse nicht gefunden');return}
     const p=d.places[0];
-    savedLocations.push({name,address:p.formattedAddress||addr,lat:p.location.latitude,lng:p.location.longitude});
-    saveLocations();renderLocList();updateStartSel();
+    const loc={name,address:p.formattedAddress||addr,lat:p.location.latitude,lng:p.location.longitude};
+    const{data,error}=await supa.from('locations').insert(loc).select().single();
+    if(error){toast('Fehler: '+error.message);return}
+    savedLocations.push(data);
+    renderLocList();updateStartSel();
     document.getElementById('loc-name').value='';
     document.getElementById('loc-addr').value='';
     toast('✓ '+name+' gespeichert');
   }catch(e){toast('Fehler: '+e.message)}
 }
 
-function deleteLocation(i){
+async function deleteLocation(i){
   if(!confirm(savedLocations[i].name+' löschen?'))return;
-  savedLocations.splice(i,1);saveLocations();renderLocList();updateStartSel();
+  const id=savedLocations[i].id;
+  if(id)await supa.from('locations').delete().eq('id',id);
+  savedLocations.splice(i,1);renderLocList();updateStartSel();
 }
 
 // ═══ DATEN EXPORT / IMPORT ═══════════════════════════════════════════════════
@@ -1456,8 +1465,14 @@ async function importJSON(input){
     if(obj.companyId)await dPut('vi',obj);
   }
   if(payload.savedLocations?.length){
-    savedLocations=payload.savedLocations;
-    saveLocations();renderLocList();updateStartSel();
+    await supa.from('locations').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    const inserted=[];
+    for(const l of payload.savedLocations){
+      const{data}=await supa.from('locations').insert({name:l.name,address:l.address||'',lat:l.lat,lng:l.lng}).select().single();
+      if(data)inserted.push(data);
+    }
+    savedLocations=inserted;
+    renderLocList();updateStartSel();
   }
   closeDataModal();showCos();renderCustomers();
   const locMsg=payload.savedLocations?.length?`, ${payload.savedLocations.length} Standorte`:'';
@@ -1478,8 +1493,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   initMap();
   showCos();
   await loadTourFromDB();
-  renderLocList();
-  updateStartSel();
+  await loadLocationsFromDB();
 
   // Follow-up check
   dAll('co').then(cos=>{
