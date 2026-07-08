@@ -1303,19 +1303,26 @@ function renderLocList(){
 
 function updateStartSel(){
   const sel=document.getElementById('tour-start-sel');
-  while(sel.options.length>1)sel.remove(1);
+  sel.innerHTML='<option value="gps">📍 GPS-Standort</option>';
   savedLocations.forEach((l,i)=>{
     const o=document.createElement('option');
     o.value='loc_'+i;o.textContent='📍 '+l.name;
     sel.appendChild(o);
   });
+  const custom1=document.createElement('option');
+  custom1.value='custom';custom1.textContent='✏️ Beliebiger Ort…';
+  sel.appendChild(custom1);
+
   const sel2=document.getElementById('tour-end-sel');
-  while(sel2.options.length>2)sel2.remove(2);
+  sel2.innerHTML='<option value="none">— Kein Endpunkt —</option><option value="gps">📍 GPS-Standort</option>';
   savedLocations.forEach((l,i)=>{
     const o=document.createElement('option');
     o.value='loc_'+i;o.textContent='📍 '+l.name;
     sel2.appendChild(o);
   });
+  const custom2=document.createElement('option');
+  custom2.value='custom';custom2.textContent='✏️ Beliebiger Ort…';
+  sel2.appendChild(custom2);
 }
 
 function onEndSelChange(){
