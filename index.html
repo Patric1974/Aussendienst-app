@@ -272,6 +272,7 @@ button{cursor:pointer;font-family:inherit}
           <option value="custom">🔍 Adresse suchen…</option>
         </select>
         <div id="start-custom-label" style="display:none;font-size:12px;color:var(--primary);margin-top:3px;font-weight:600"></div>
+        <button id="start-custom-btn" onclick="openPointModal('start')" style="display:none;margin-top:4px;width:100%;padding:6px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🔍 Adresse eingeben</button>
       </div>
       <div style="flex:1">
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Endpunkt</label>
@@ -281,6 +282,7 @@ button{cursor:pointer;font-family:inherit}
           <option value="custom">🔍 Adresse suchen…</option>
         </select>
         <div id="end-custom-label" style="display:none;font-size:12px;color:var(--primary);margin-top:3px;font-weight:600"></div>
+        <button id="end-custom-btn" onclick="openPointModal('end')" style="display:none;margin-top:4px;width:100%;padding:6px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🔍 Adresse eingeben</button>
       </div>
     </div>
     <h3 id="tour-title">Keine Stops ausgewählt</h3>
@@ -1340,7 +1342,8 @@ function updateStartSel(){
 async function onEndSelChange(){
   const v=document.getElementById('tour-end-sel').value;
   document.getElementById('end-custom-label').style.display='none';
-  if(v==='custom'){openPointModal('end');return}
+  document.getElementById('end-custom-btn').style.display=v==='custom'?'block':'none';
+  if(v==='custom'){tourEndLat=null;tourEndLng=null;return}
   if(v==='none'){tourEndLat=null;tourEndLng=null}
   else if(v==='gps'){tourEndLat=uLat;tourEndLng=uLng}
   else{const i=parseInt(v.replace('loc_',''));tourEndLat=savedLocations[i].lat;tourEndLng=savedLocations[i].lng}
@@ -1351,7 +1354,8 @@ async function onEndSelChange(){
 async function onStartSelChange(){
   const v=document.getElementById('tour-start-sel').value;
   document.getElementById('start-custom-label').style.display='none';
-  if(v==='custom'){openPointModal('start');return}
+  document.getElementById('start-custom-btn').style.display=v==='custom'?'block':'none';
+  if(v==='custom'){tourStartLat=null;tourStartLng=null;return}
   if(v==='gps'){tourStartLat=null;tourStartLng=null}
   else{const i=parseInt(v.replace('loc_',''));tourStartLat=savedLocations[i].lat;tourStartLng=savedLocations[i].lng}
   const saveVal=v.startsWith('loc_')?'loc_name:'+savedLocations[parseInt(v.replace('loc_',''))].name:v;
