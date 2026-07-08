@@ -1329,7 +1329,7 @@ function updateStartSel(){
   sel2.appendChild(custom2);
 }
 
-function onEndSelChange(){
+async function onEndSelChange(){
   const v=document.getElementById('tour-end-sel').value;
   const box=document.getElementById('end-custom-box');
   box.style.display=v==='custom'?'block':'none';
@@ -1337,18 +1337,19 @@ function onEndSelChange(){
   else if(v==='gps'){tourEndLat=uLat;tourEndLng=uLng}
   else if(v==='custom'){tourEndLat=null;tourEndLng=null}
   else{const i=parseInt(v.replace('loc_',''));tourEndLat=savedLocations[i].lat;tourEndLng=savedLocations[i].lng}
+  const saveVal=v.startsWith('loc_')?'loc_name:'+savedLocations[parseInt(v.replace('loc_',''))].name:v;
+  await supa.from('settings').upsert({key:'tour_end',value:saveVal});
 }
 
-function onStartSelChange(){
+async function onStartSelChange(){
   const v=document.getElementById('tour-start-sel').value;
   const box=document.getElementById('start-custom-box');
   box.style.display=v==='custom'?'block':'none';
   if(v==='gps'){tourStartLat=null;tourStartLng=null}
   else if(v==='custom'){tourStartLat=null;tourStartLng=null}
-  else{
-    const i=parseInt(v.replace('loc_',''));
-    tourStartLat=savedLocations[i].lat;tourStartLng=savedLocations[i].lng;
-  }
+  else{const i=parseInt(v.replace('loc_',''));tourStartLat=savedLocations[i].lat;tourStartLng=savedLocations[i].lng}
+  const saveVal=v.startsWith('loc_')?'loc_name:'+savedLocations[parseInt(v.replace('loc_',''))].name:v;
+  await supa.from('settings').upsert({key:'tour_start',value:saveVal});
 }
 
 async function geocodeCustomPoint(which){
@@ -1357,14 +1358,57 @@ async function geocodeCustomPoint(which){
   if(!addr){toast('Bitte Adresse eingeben');return}
   toast('Adresse wird gesucht…');
   try{
-    const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr)+'&limit=1&countrycodes=ch,li',{headers:{'Accept-Language':'de'}});
+    const body={textQuery:addr,maxResultCount:1,languageCode:'de',regionCode:'CH'};
+    const res=await fetch('https://places.googleapis.com/v1/places:searchText?key='+GKEY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Goog-FieldMask':'places.location,places.displayName'},
+      body:JSON.stringify(body)
+    });
     const d=await res.json();
-    if(!d.length){toast('Adresse nicht gefunden');return}
-    const lat=parseFloat(d[0].lat),lng=parseFloat(d[0].lon);
+    if(!d.places?.length){toast('Adresse nicht gefunden');return}
+    const lat=d.places[0].location.latitude,lng=d.places[0].location.longitude;
+    const name=d.places[0].displayName?.text||addr;
     if(which==='start'){tourStartLat=lat;tourStartLng=lng}
     else{tourEndLat=lat;tourEndLng=lng}
-    toast('✓ '+d[0].display_name.split(',')[0]+' gefunden');
+    await supa.from('settings').upsert([
+      {key:'tour_'+which+'_lat',value:String(lat)},
+      {key:'tour_'+which+'_lng',value:String(lng)},
+      {key:'tour_'+which+'_addr',value:addr}
+    ]);
+    toast('✓ '+name+' als '+( which==='start'?'Startpunkt':'Endpunkt')+' gesetzt');
+    renderTour();
   }catch(e){toast('Fehler: '+e.message)}
+}
+
+async function loadTourPointSettings(){
+  const{data}=await supa.from('settings').select('*');
+  if(!data||!data.length)return;
+  const s=Object.fromEntries(data.map(r=>[r.key,r.value]));
+  function restorePoint(which,val){
+    const sel=document.getElementById('tour-'+which+'-sel');
+    if(!val)return;
+    if(val==='gps'||val==='none'){
+      sel.value=val;
+      if(which==='start'){tourStartLat=null;tourStartLng=null}
+      else{tourEndLat=null;tourEndLng=null}
+    }else if(val==='custom'){
+      sel.value='custom';
+      const lat=parseFloat(s['tour_'+which+'_lat']),lng=parseFloat(s['tour_'+which+'_lng']);
+      if(which==='start'){tourStartLat=lat;tourStartLng=lng}else{tourEndLat=lat;tourEndLng=lng}
+      document.getElementById(which+'-custom-box').style.display='block';
+      if(s['tour_'+which+'_addr'])document.getElementById(which+'-custom-addr').value=s['tour_'+which+'_addr'];
+    }else if(val.startsWith('loc_name:')){
+      const name=val.replace('loc_name:','');
+      const idx=savedLocations.findIndex(l=>l.name===name);
+      if(idx!==-1){
+        sel.value='loc_'+idx;
+        if(which==='start'){tourStartLat=savedLocations[idx].lat;tourStartLng=savedLocations[idx].lng}
+        else{tourEndLat=savedLocations[idx].lat;tourEndLng=savedLocations[idx].lng}
+      }
+    }
+  }
+  restorePoint('start',s.tour_start);
+  restorePoint('end',s.tour_end);
 }
 
 async function addLocation(){
@@ -1494,6 +1538,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   showCos();
   await loadTourFromDB();
   await loadLocationsFromDB();
+  await loadTourPointSettings();
 
   // Follow-up check
   dAll('co').then(cos=>{
