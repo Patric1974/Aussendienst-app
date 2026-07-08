@@ -459,7 +459,7 @@ function openDB(){
 }
 
 // Row converters: DB (snake_case) ↔ App (camelCase)
-function rowToCo(r){return{...r,lastVisit:r.last_visit,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by||'',contacts:r.contacts||[]}}
+function rowToCo(r){return{...r,lastVisit:r.last_visit,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by||'',inTour:r.in_tour||false,contacts:r.contacts||[]}}
 function rowToVi(r){return{...r,companyId:r.company_id,createdAt:r.created_at,createdBy:r.created_by||''}}
 function coToRow(c){
   const r={...c};
@@ -467,6 +467,7 @@ function coToRow(c){
   if('createdAt' in r){r.created_at=r.createdAt;delete r.createdAt}
   if('updatedAt' in r){r.updated_at=r.updatedAt;delete r.updatedAt}
   if('createdBy' in r){r.created_by=r.createdBy;delete r.createdBy}
+  if('inTour' in r){r.in_tour=r.inTour;delete r.inTour}
   return r;
 }
 function viToRow(v){
@@ -675,11 +676,15 @@ function distM(lat1,lng1,lat2,lng2){
 }
 
 // ═══ TOUR ════════════════════════════════════════════════════════════════════
-let tourIds=JSON.parse(localStorage.getItem('tourIds')||'[]');
+let tourIds=[];
 // Optimized order (array of company objects), set after OSRM call
 let tourOrdered=[];
 
-function saveTour(){localStorage.setItem('tourIds',JSON.stringify(tourIds))}
+async function loadTourFromDB(){
+  const all=await dAll('co');
+  tourIds=all.filter(c=>c.inTour).map(c=>c.id);
+  updateTourBadge();
+}
 
 function updateTourBadge(){
   const b=document.getElementById('tour-badge');
@@ -687,15 +692,20 @@ function updateTourBadge(){
   else b.style.display='none';
 }
 
-function toggleTour(id){
+async function toggleTour(id){
   const idx=tourIds.indexOf(id);
-  if(idx===-1)tourIds.push(id);else tourIds.splice(idx,1);
-  tourOrdered=[];// reset optimized order when list changes
-  saveTour();updateTourBadge();renderCustomers();
+  const inTour=idx===-1;
+  if(inTour)tourIds.push(id);else tourIds.splice(idx,1);
+  tourOrdered=[];
+  await supa.from('companies').update({in_tour:inTour}).eq('id',id);
+  updateTourBadge();renderCustomers();
 }
 
-function clearTour(){
-  tourIds=[];tourOrdered=[];saveTour();updateTourBadge();renderTour();renderCustomers();
+async function clearTour(){
+  for(const id of tourIds){
+    await supa.from('companies').update({in_tour:false}).eq('id',id);
+  }
+  tourIds=[];tourOrdered=[];updateTourBadge();renderTour();renderCustomers();
 }
 
 async function renderTour(){
@@ -1428,7 +1438,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   if(!getUserName())askUserName();
   initMap();
   showCos();
-  updateTourBadge();
+  await loadTourFromDB();
   renderLocList();
   updateStartSel();
 
