@@ -269,24 +269,18 @@ button{cursor:pointer;font-family:inherit}
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Startpunkt</label>
         <select class="start-sel" id="tour-start-sel" onchange="onStartSelChange()">
           <option value="gps">📍 GPS-Standort</option>
-          <option value="custom">✏️ Beliebiger Ort…</option>
+          <option value="custom">🔍 Adresse suchen…</option>
         </select>
-        <div id="start-custom-box" style="display:none;margin-top:4px;display:none">
-          <input id="start-custom-addr" type="text" placeholder="Adresse eingeben…" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box" onkeydown="if(event.key==='Enter')geocodeCustomPoint('start')">
-          <button onclick="geocodeCustomPoint('start')" style="margin-top:4px;width:100%;padding:5px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Suchen</button>
-        </div>
+        <div id="start-custom-label" style="display:none;font-size:12px;color:var(--primary);margin-top:3px;font-weight:600"></div>
       </div>
       <div style="flex:1">
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Endpunkt</label>
         <select class="start-sel" id="tour-end-sel" onchange="onEndSelChange()">
           <option value="none">— Kein Endpunkt —</option>
           <option value="gps">📍 GPS-Standort</option>
-          <option value="custom">✏️ Beliebiger Ort…</option>
+          <option value="custom">🔍 Adresse suchen…</option>
         </select>
-        <div id="end-custom-box" style="display:none;margin-top:4px">
-          <input id="end-custom-addr" type="text" placeholder="Adresse eingeben…" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box" onkeydown="if(event.key==='Enter')geocodeCustomPoint('end')">
-          <button onclick="geocodeCustomPoint('end')" style="margin-top:4px;width:100%;padding:5px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Suchen</button>
-        </div>
+        <div id="end-custom-label" style="display:none;font-size:12px;color:var(--primary);margin-top:3px;font-weight:600"></div>
       </div>
     </div>
     <h3 id="tour-title">Keine Stops ausgewählt</h3>
@@ -397,6 +391,20 @@ button{cursor:pointer;font-family:inherit}
 </div>
 
 <!-- MODAL DATEN -->
+<div id="mpoint" class="modal hidden" onclick="if(event.target===this)closePointModal()">
+  <div class="mbox">
+    <div class="mh"><h2 id="mpoint-title">📍 Startpunkt suchen</h2><button class="ibtn" onclick="closePointModal()">✕</button></div>
+    <div class="mb" style="padding:18px;display:flex;flex-direction:column;gap:10px">
+      <input id="mpoint-inp" type="text" placeholder="Adresse eingeben…" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;box-sizing:border-box" onkeydown="if(event.key==='Enter')searchPointAddr()">
+      <button onclick="searchPointAddr()" style="padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">🔍 Suchen</button>
+      <div id="mpoint-result" style="display:none;padding:12px;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:8px">
+        <div id="mpoint-found" style="font-size:14px;font-weight:600;color:#15803d"></div>
+        <button onclick="confirmPointAddr()" style="margin-top:10px;width:100%;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">✓ Als Punkt übernehmen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="mdat" class="modal hidden">
   <div class="mbox" style="max-height:80vh">
     <div class="mh"><h2>⚙️ Datenverwaltung</h2><button class="ibtn" id="mdat-x" style="color:#374151;font-size:20px">✕</button></div>
@@ -1331,11 +1339,10 @@ function updateStartSel(){
 
 async function onEndSelChange(){
   const v=document.getElementById('tour-end-sel').value;
-  const box=document.getElementById('end-custom-box');
-  box.style.display=v==='custom'?'block':'none';
+  document.getElementById('end-custom-label').style.display='none';
+  if(v==='custom'){openPointModal('end');return}
   if(v==='none'){tourEndLat=null;tourEndLng=null}
   else if(v==='gps'){tourEndLat=uLat;tourEndLng=uLng}
-  else if(v==='custom'){tourEndLat=null;tourEndLng=null}
   else{const i=parseInt(v.replace('loc_',''));tourEndLat=savedLocations[i].lat;tourEndLng=savedLocations[i].lng}
   const saveVal=v.startsWith('loc_')?'loc_name:'+savedLocations[parseInt(v.replace('loc_',''))].name:v;
   await supa.from('settings').upsert({key:'tour_end',value:saveVal});
@@ -1343,41 +1350,69 @@ async function onEndSelChange(){
 
 async function onStartSelChange(){
   const v=document.getElementById('tour-start-sel').value;
-  const box=document.getElementById('start-custom-box');
-  box.style.display=v==='custom'?'block':'none';
+  document.getElementById('start-custom-label').style.display='none';
+  if(v==='custom'){openPointModal('start');return}
   if(v==='gps'){tourStartLat=null;tourStartLng=null}
-  else if(v==='custom'){tourStartLat=null;tourStartLng=null}
   else{const i=parseInt(v.replace('loc_',''));tourStartLat=savedLocations[i].lat;tourStartLng=savedLocations[i].lng}
   const saveVal=v.startsWith('loc_')?'loc_name:'+savedLocations[parseInt(v.replace('loc_',''))].name:v;
   await supa.from('settings').upsert({key:'tour_start',value:saveVal});
 }
 
-async function geocodeCustomPoint(which){
-  const inputId=which==='start'?'start-custom-addr':'end-custom-addr';
-  const addr=document.getElementById(inputId).value.trim();
+let _pointWhich='start';
+let _pointLat=null,_pointLng=null,_pointName='';
+
+function openPointModal(which){
+  _pointWhich=which;_pointLat=null;_pointLng=null;_pointName='';
+  document.getElementById('mpoint-title').textContent=(which==='start'?'🚀 Startpunkt':'🏁 Endpunkt')+' suchen';
+  document.getElementById('mpoint-inp').value='';
+  document.getElementById('mpoint-result').style.display='none';
+  document.getElementById('mpoint').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('mpoint-inp').focus(),100);
+}
+
+function closePointModal(){
+  document.getElementById('mpoint').classList.add('hidden');
+  // If no point was confirmed, reset dropdown
+  const sel=document.getElementById('tour-'+_pointWhich+'-sel');
+  const label=document.getElementById(_pointWhich+'-custom-label');
+  if(!_pointLat){sel.value=_pointWhich==='start'?'gps':'none';label.style.display='none';}
+}
+
+async function searchPointAddr(){
+  const addr=document.getElementById('mpoint-inp').value.trim();
   if(!addr){toast('Bitte Adresse eingeben');return}
-  toast('Adresse wird gesucht…');
+  document.getElementById('mpoint-found').textContent='Suche läuft…';
+  document.getElementById('mpoint-result').style.display='block';
   try{
     const body={textQuery:addr,maxResultCount:1,languageCode:'de',regionCode:'CH'};
     const res=await fetch('https://places.googleapis.com/v1/places:searchText?key='+GKEY,{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-Goog-FieldMask':'places.location,places.displayName'},
+      headers:{'Content-Type':'application/json','X-Goog-FieldMask':'places.location,places.displayName,places.formattedAddress'},
       body:JSON.stringify(body)
     });
     const d=await res.json();
-    if(!d.places?.length){toast('Adresse nicht gefunden');return}
-    const lat=d.places[0].location.latitude,lng=d.places[0].location.longitude;
-    const name=d.places[0].displayName?.text||addr;
-    if(which==='start'){tourStartLat=lat;tourStartLng=lng}
-    else{tourEndLat=lat;tourEndLng=lng}
-    await supa.from('settings').upsert([
-      {key:'tour_'+which+'_lat',value:String(lat)},
-      {key:'tour_'+which+'_lng',value:String(lng)},
-      {key:'tour_'+which+'_addr',value:addr}
-    ]);
-    toast('✓ '+name+' als '+( which==='start'?'Startpunkt':'Endpunkt')+' gesetzt');
-    renderTour();
-  }catch(e){toast('Fehler: '+e.message)}
+    if(!d.places?.length){document.getElementById('mpoint-found').textContent='❌ Adresse nicht gefunden';return}
+    _pointLat=d.places[0].location.latitude;_pointLng=d.places[0].location.longitude;
+    _pointName=d.places[0].formattedAddress||d.places[0].displayName?.text||addr;
+    document.getElementById('mpoint-found').textContent='✓ '+_pointName;
+  }catch(e){document.getElementById('mpoint-found').textContent='Fehler: '+e.message}
+}
+
+async function confirmPointAddr(){
+  if(!_pointLat){toast('Zuerst suchen');return}
+  if(_pointWhich==='start'){tourStartLat=_pointLat;tourStartLng=_pointLng}
+  else{tourEndLat=_pointLat;tourEndLng=_pointLng}
+  const label=document.getElementById(_pointWhich+'-custom-label');
+  label.textContent='📍 '+_pointName;label.style.display='block';
+  await supa.from('settings').upsert([
+    {key:'tour_'+_pointWhich,value:'custom'},
+    {key:'tour_'+_pointWhich+'_lat',value:String(_pointLat)},
+    {key:'tour_'+_pointWhich+'_lng',value:String(_pointLng)},
+    {key:'tour_'+_pointWhich+'_addr',value:_pointName}
+  ]);
+  document.getElementById('mpoint').classList.add('hidden');
+  renderTour();
+  toast('✓ '+_pointName+' gesetzt');
 }
 
 async function loadTourPointSettings(){
@@ -1395,8 +1430,8 @@ async function loadTourPointSettings(){
       sel.value='custom';
       const lat=parseFloat(s['tour_'+which+'_lat']),lng=parseFloat(s['tour_'+which+'_lng']);
       if(which==='start'){tourStartLat=lat;tourStartLng=lng}else{tourEndLat=lat;tourEndLng=lng}
-      document.getElementById(which+'-custom-box').style.display='block';
-      if(s['tour_'+which+'_addr'])document.getElementById(which+'-custom-addr').value=s['tour_'+which+'_addr'];
+      const lbl=document.getElementById(which+'-custom-label');
+      if(s['tour_'+which+'_addr']){lbl.textContent='📍 '+s['tour_'+which+'_addr'];lbl.style.display='block';}
     }else if(val.startsWith('loc_name:')){
       const name=val.replace('loc_name:','');
       const idx=savedLocations.findIndex(l=>l.name===name);
