@@ -269,14 +269,24 @@ button{cursor:pointer;font-family:inherit}
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Startpunkt</label>
         <select class="start-sel" id="tour-start-sel" onchange="onStartSelChange()">
           <option value="gps">📍 GPS-Standort</option>
+          <option value="custom">✏️ Beliebiger Ort…</option>
         </select>
+        <div id="start-custom-box" style="display:none;margin-top:4px;display:none">
+          <input id="start-custom-addr" type="text" placeholder="Adresse eingeben…" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box" onkeydown="if(event.key==='Enter')geocodeCustomPoint('start')">
+          <button onclick="geocodeCustomPoint('start')" style="margin-top:4px;width:100%;padding:5px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Suchen</button>
+        </div>
       </div>
       <div style="flex:1">
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Endpunkt</label>
         <select class="start-sel" id="tour-end-sel" onchange="onEndSelChange()">
           <option value="none">— Kein Endpunkt —</option>
           <option value="gps">📍 GPS-Standort</option>
+          <option value="custom">✏️ Beliebiger Ort…</option>
         </select>
+        <div id="end-custom-box" style="display:none;margin-top:4px">
+          <input id="end-custom-addr" type="text" placeholder="Adresse eingeben…" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box" onkeydown="if(event.key==='Enter')geocodeCustomPoint('end')">
+          <button onclick="geocodeCustomPoint('end')" style="margin-top:4px;width:100%;padding:5px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Suchen</button>
+        </div>
       </div>
     </div>
     <h3 id="tour-title">Keine Stops ausgewählt</h3>
@@ -1310,18 +1320,40 @@ function updateStartSel(){
 
 function onEndSelChange(){
   const v=document.getElementById('tour-end-sel').value;
+  const box=document.getElementById('end-custom-box');
+  box.style.display=v==='custom'?'block':'none';
   if(v==='none'){tourEndLat=null;tourEndLng=null}
   else if(v==='gps'){tourEndLat=uLat;tourEndLng=uLng}
+  else if(v==='custom'){tourEndLat=null;tourEndLng=null}
   else{const i=parseInt(v.replace('loc_',''));tourEndLat=savedLocations[i].lat;tourEndLng=savedLocations[i].lng}
 }
 
 function onStartSelChange(){
   const v=document.getElementById('tour-start-sel').value;
+  const box=document.getElementById('start-custom-box');
+  box.style.display=v==='custom'?'block':'none';
   if(v==='gps'){tourStartLat=null;tourStartLng=null}
+  else if(v==='custom'){tourStartLat=null;tourStartLng=null}
   else{
     const i=parseInt(v.replace('loc_',''));
     tourStartLat=savedLocations[i].lat;tourStartLng=savedLocations[i].lng;
   }
+}
+
+async function geocodeCustomPoint(which){
+  const inputId=which==='start'?'start-custom-addr':'end-custom-addr';
+  const addr=document.getElementById(inputId).value.trim();
+  if(!addr){toast('Bitte Adresse eingeben');return}
+  toast('Adresse wird gesucht…');
+  try{
+    const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr)+'&limit=1&countrycodes=ch,li',{headers:{'Accept-Language':'de'}});
+    const d=await res.json();
+    if(!d.length){toast('Adresse nicht gefunden');return}
+    const lat=parseFloat(d[0].lat),lng=parseFloat(d[0].lon);
+    if(which==='start'){tourStartLat=lat;tourStartLng=lng}
+    else{tourEndLat=lat;tourEndLng=lng}
+    toast('✓ '+d[0].display_name.split(',')[0]+' gefunden');
+  }catch(e){toast('Fehler: '+e.message)}
 }
 
 async function addLocation(){
